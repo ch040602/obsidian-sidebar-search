@@ -1,0 +1,9 @@
+This project is designed to vendor Obsidian Web Clipper through git subtree under:
+
+  vendor/obsidian-clipper/
+
+The vendored upstream project is:
+
+  https://github.com/obsidianmd/obsidian-clipper
+
+This project is not affiliated with or endorsed by Obsidian. Do not use Obsidian trademarks, icons, or marketing assets unless you have the appropriate rights.

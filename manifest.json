@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Obsidian Local Clipper Companion",
+  "version": "0.1.0",
+  "description": "Local-first Chrome extension that indexes an Obsidian vault, searches selected words as tags, and opens matching notes in Obsidian.",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "sidePanel",
+    "scripting",
+    "storage",
+    "tabs",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_title": "Open Obsidian Companion"
+  },
+  "background": {
+    "service_worker": "src/background/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/content/selection-tracker.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "toggle_panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
+      },
+      "description": "Toggle the Obsidian side panel"
+    },
+    "search_selection_as_tag": {
+      "suggested_key": {
+        "default": "Alt+Shift+T",
+        "mac": "Alt+Shift+T"
+      },
+      "description": "Search the selected word as an Obsidian tag"
+    }
+  }
+}
