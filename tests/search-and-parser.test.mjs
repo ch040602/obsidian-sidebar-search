@@ -8,8 +8,6 @@ import { normalizeTagInput, tagVariantsFromSelection } from '../src/lib/tag-util
 import { normalizeUrl, domainFromUrl } from '../src/lib/url-utils.js';
 import { shouldIndexParsedNote } from '../src/lib/vault-access.js';
 import { normalizeLanguage, translate } from '../src/lib/i18n.js';
-import { makeWebClipPath } from '../src/lib/web-clip-path.js';
-import { buildObsidianClipperNote } from '../src/lib/obsidian-clipper-adapter.js';
 
 globalThis.chrome = {
   storage: {
@@ -36,23 +34,22 @@ test('parses LF and CRLF frontmatter tags before privacy filtering', () => {
 
   const note = parseMarkdownNote({
     path: 'Private Note.md',
-    markdown: '---\r\ntags: [Private, web-clip]\r\naliases:\r\n  - 비밀 노트\r\nsource_url: "https://www.example.com/a?utm_source=x&keep=1#frag"\r\n---\r\n# Hidden\r\n본문 #연구/자료'
+    markdown: '---\r\ntags: [Private, reference]\r\naliases:\r\n  - 비밀 노트\r\nsource_url: "https://www.example.com/a?utm_source=x&keep=1#frag"\r\n---\r\n# Hidden\r\n본문 #연구/자료'
   });
 
-  assert.deepEqual(note.tags, ['private', 'web-clip', '연구/자료']);
+  assert.deepEqual(note.tags, ['private', 'reference', '연구/자료']);
   assert.deepEqual(note.aliases, ['비밀 노트']);
   assert.deepEqual(note.normalizedSourceUrls, ['https://example.com/a?keep=1']);
   assert.deepEqual(note.domains, ['example.com']);
 });
 
 test('normalizes selection text into useful Obsidian tag variants', () => {
-  assert.equal(normalizeTagInput('#Web Clipper!'), 'web-clipper');
-  assert.deepEqual(tagVariantsFromSelection('Obsidian Web Clipper'), [
-    'obsidian-web-clipper',
-    'obsidianwebclipper',
-    'obsidian',
-    'web',
-    'clipper'
+  assert.equal(normalizeTagInput('#Machine Learning!'), 'machine-learning');
+  assert.deepEqual(tagVariantsFromSelection('Deep Learning'), [
+    'deep-learning',
+    'deeplearning',
+    'deep',
+    'learning'
   ]);
   assert.equal(normalizeTagInput('한국어 태그'), '한국어-태그');
 });
@@ -60,9 +57,9 @@ test('normalizes selection text into useful Obsidian tag variants', () => {
 test('tag search only returns actual tags and ignores hash prefix differences', async () => {
   const index = [
     {
-      path: 'Public/Web Clipper.md',
+      path: 'Public/Machine Learning.md',
       title: 'Reference',
-      tags: ['web-clipper'],
+      tags: ['machine-learning'],
       aliases: [],
       headings: [],
       excerpt: 'public note',
@@ -72,7 +69,7 @@ test('tag search only returns actual tags and ignores hash prefix differences', 
     {
       path: 'Public/Nested.md',
       title: 'Nested',
-      tags: ['web-clipper/plugin'],
+      tags: ['machine-learning/papers'],
       aliases: [],
       headings: [],
       excerpt: 'nested tag',
@@ -81,18 +78,18 @@ test('tag search only returns actual tags and ignores hash prefix differences', 
     },
     {
       path: 'Public/Text Only.md',
-      title: 'Web Clipper',
+      title: 'Machine Learning',
       tags: [],
-      aliases: ['Web Clipper'],
-      headings: ['Web Clipper'],
-      excerpt: 'web clipper appears only in content',
-      contentText: 'web clipper appears only in content',
+      aliases: ['Machine Learning'],
+      headings: ['Machine Learning'],
+      excerpt: 'machine learning appears only in content',
+      contentText: 'machine learning appears only in content',
       mtime: 5
     },
     {
       path: 'Private/Visible Tag.md',
       title: 'Should not display',
-      tags: ['web-clipper'],
+      tags: ['machine-learning'],
       aliases: [],
       headings: [],
       excerpt: 'private folder',
@@ -102,7 +99,7 @@ test('tag search only returns actual tags and ignores hash prefix differences', 
     {
       path: 'Public/Secret.md',
       title: 'Should not display',
-      tags: ['web-clipper', 'secret'],
+      tags: ['machine-learning', 'secret'],
       aliases: [],
       headings: [],
       excerpt: 'secret tag',
@@ -113,17 +110,17 @@ test('tag search only returns actual tags and ignores hash prefix differences', 
 
   const withoutHash = await searchVaultIndex(index, {
     mode: 'tag',
-    query: 'web-clipper',
+    query: 'machine-learning',
     limit: 10
   });
   const withHash = await searchVaultIndex(index, {
     mode: 'tag',
-    query: '#web-clipper',
+    query: '#machine-learning',
     limit: 10
   });
 
   assert.deepEqual(withoutHash.map((result) => result.path), [
-    'Public/Web Clipper.md',
+    'Public/Machine Learning.md',
     'Public/Nested.md'
   ]);
   assert.deepEqual(withHash.map((result) => result.path), withoutHash.map((result) => result.path));
@@ -133,9 +130,9 @@ test('tag search only returns actual tags and ignores hash prefix differences', 
 test('tag search does not match partial words inside real tags', async () => {
   const index = [
     {
-      path: 'Public/Web Clipper.md',
+      path: 'Public/Machine Learning.md',
       title: 'Reference',
-      tags: ['web-clipper'],
+      tags: ['machine-learning'],
       aliases: [],
       headings: [],
       excerpt: '',
@@ -146,7 +143,7 @@ test('tag search does not match partial words inside real tags', async () => {
 
   const results = await searchVaultIndex(index, {
     mode: 'tag',
-    query: 'web',
+    query: 'machine',
     limit: 10
   });
 
@@ -156,9 +153,9 @@ test('tag search does not match partial words inside real tags', async () => {
 test('text search also matches tag variants from selected words', async () => {
   const index = [
     {
-      path: 'Public/Web Clipper.md',
+      path: 'Public/Machine Learning.md',
       title: 'Reference',
-      tags: ['web-clipper'],
+      tags: ['machine-learning'],
       aliases: [],
       headings: [],
       excerpt: '',
@@ -169,23 +166,23 @@ test('text search also matches tag variants from selected words', async () => {
 
   const results = await searchVaultIndex(index, {
     mode: 'text',
-    query: 'Web Clipper',
+    query: 'Machine Learning',
     limit: 10
   });
 
-  assert.equal(results[0].path, 'Public/Web Clipper.md');
-  assert.ok(results[0].reasons.includes('#web-clipper 태그 일치'));
+  assert.equal(results[0].path, 'Public/Machine Learning.md');
+  assert.ok(results[0].reasons.includes('#machine-learning 태그 일치'));
 });
 
 test('blocks excluded-tag notes before index persistence', () => {
   const settings = { excludedTags: ['private', 'secret'] };
 
   assert.equal(
-    shouldIndexParsedNote({ tags: ['web-clipper', 'private'] }, settings),
+    shouldIndexParsedNote({ tags: ['machine-learning', 'private'] }, settings),
     false
   );
   assert.equal(
-    shouldIndexParsedNote({ tags: ['web-clipper'] }, settings),
+    shouldIndexParsedNote({ tags: ['machine-learning'] }, settings),
     true
   );
 });
@@ -262,32 +259,6 @@ test('normalizes URLs and domains consistently', () => {
 test('translates UI labels for Korean and English language choices', () => {
   assert.equal(normalizeLanguage('en'), 'en');
   assert.equal(normalizeLanguage('unknown'), 'ko');
-  assert.equal(translate('ko', 'tagResults', { tag: 'web-clipper', count: 2 }), '실제 태그 검색: #web-clipper · 2개 결과');
-  assert.equal(translate('en', 'tagResults', { tag: 'web-clipper', count: 2 }), 'Actual tag search: #web-clipper · 2 results');
-});
-
-test('builds configurable web clip save paths safely', () => {
-  const path = makeWebClipPath(
-    { webClipPathTemplate: 'Clips/{{domain}}/{{date}} - {{title}}' },
-    { title: 'A/B: C?' },
-    { url: 'https://www.example.com/post' }
-  );
-
-  assert.match(path, /^Clips\/example\.com\/\d{4}-\d{2}-\d{2} - A-B- C-\.md$/);
-});
-
-test('obsidian clipper adapter falls back when full page html is unavailable', async () => {
-  const note = await buildObsidianClipperNote({
-    pageContext: {
-      title: 'Fallback Page',
-      url: 'https://example.com',
-      description: 'Short description',
-      selectedText: 'Selected text'
-    },
-    localImages: []
-  });
-
-  assert.equal(note.engine, 'basic-fallback');
-  assert.equal(note.title, 'Fallback Page');
-  assert.match(note.markdown, /source_url: "https:\/\/example\.com"/);
+  assert.equal(translate('ko', 'tagResults', { tag: 'machine-learning', count: 2 }), '실제 태그 검색: #machine-learning · 2개 결과');
+  assert.equal(translate('en', 'tagResults', { tag: 'machine-learning', count: 2 }), 'Actual tag search: #machine-learning · 2 results');
 });

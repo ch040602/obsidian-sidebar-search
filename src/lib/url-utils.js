@@ -1,5 +1,5 @@
 // 역할: 현재 페이지 URL과 노트의 source_url을 비교하기 쉽게 정규화합니다.
-// tracking parameter를 제거해야 같은 페이지를 중복 저장한 경우도 찾을 수 있습니다.
+// tracking parameter를 제거해야 같은 페이지를 가리키는 노트를 안정적으로 찾을 수 있습니다.
 
 const TRACKING_PARAMS = new Set([
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',

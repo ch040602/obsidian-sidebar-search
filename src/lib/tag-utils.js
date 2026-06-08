@@ -1,5 +1,5 @@
 // 역할: 사용자가 드래그한 단어를 Obsidian 태그 검색어로 정규화합니다.
-// 예: "Web Clipper" -> "web-clipper", "#Obsidian" -> "obsidian"
+// 예: "Machine Learning" -> "machine-learning", "#Obsidian" -> "obsidian"
 
 export function normalizeTagInput(text) {
   return String(text || '')

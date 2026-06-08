@@ -2,7 +2,7 @@
 
 ## Vault 접근
 
-- 사용자가 명시적으로 선택한 폴더만 접근합니다.
+- 사용자가 명시적으로 선택한 폴더만 읽습니다.
 - DirectoryHandle은 IndexedDB에 저장됩니다.
 - 브라우저 재시작 후 권한이 만료되면 다시 권한 요청이 필요할 수 있습니다.
 
@@ -10,7 +10,7 @@
 
 - Vault 검색 결과는 host page DOM에 주입하지 않습니다.
 - 검색 결과는 Chrome extension side panel 내부에서만 렌더링됩니다.
-- content script는 선택 텍스트만 background로 보냅니다.
+- content script는 선택 텍스트와 기본 페이지 메타데이터만 background로 보냅니다.
 
 ## 제외 규칙
 

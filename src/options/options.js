@@ -12,10 +12,6 @@ const els = {
   testPermission: document.querySelector('#test-permission'),
   vaultStatus: document.querySelector('#vault-status'),
   vaultName: document.querySelector('#vault-name'),
-  defaultClipFolder: document.querySelector('#default-clip-folder'),
-  webClipPathTemplate: document.querySelector('#web-clip-path-template'),
-  assetFolder: document.querySelector('#asset-folder'),
-  maxImageBytes: document.querySelector('#max-image-bytes'),
   excludedFolders: document.querySelector('#excluded-folders'),
   excludedTags: document.querySelector('#excluded-tags'),
   rebuildIndex: document.querySelector('#rebuild-index'),
@@ -34,10 +30,14 @@ async function init() {
   await refreshVaultStatus();
 
   els.uiLanguage.addEventListener('change', async () => {
-    currentSettings = { ...currentSettings, ...readForm() };
-    await saveSettings(currentSettings);
-    applyTranslations(document, currentSettings.uiLanguage);
-    await refreshVaultStatus();
+    try {
+      currentSettings = { ...currentSettings, ...readForm() };
+      await saveSettings(currentSettings);
+      applyTranslations(document, currentSettings.uiLanguage);
+      await refreshVaultStatus();
+    } catch (error) {
+      showError(error);
+    }
   });
 
   els.chooseVault.addEventListener('click', async () => {
@@ -52,31 +52,36 @@ async function init() {
 
   els.testPermission.addEventListener('click', refreshVaultStatus);
   els.saveSettings.addEventListener('click', async () => {
-    currentSettings = { ...currentSettings, ...readForm() };
-    await saveSettings(currentSettings);
-    applyTranslations(document, currentSettings.uiLanguage);
-    els.indexStatus.textContent = t('settingsSaved');
+    try {
+      currentSettings = { ...currentSettings, ...readForm() };
+      await saveSettings(currentSettings);
+      fillForm(currentSettings);
+      applyTranslations(document, currentSettings.uiLanguage);
+      els.indexStatus.textContent = t('settingsSaved');
+    } catch (error) {
+      showError(error);
+    }
   });
 
   els.rebuildIndex.addEventListener('click', async () => {
-    currentSettings = { ...currentSettings, ...readForm() };
-    await saveSettings(currentSettings);
-    els.indexStatus.textContent = t('indexStart');
-    const records = await rebuildVaultIndex((progress) => {
-      if (progress.done) els.indexStatus.textContent = t('indexingDone', { indexed: progress.indexed });
-      else els.indexStatus.textContent = t('scanProgress', { scanned: progress.scanned, indexed: progress.indexed });
-    });
-    els.indexStatus.textContent = t('indexingDone', { indexed: records.length });
+    try {
+      currentSettings = { ...currentSettings, ...readForm() };
+      await saveSettings(currentSettings);
+      els.indexStatus.textContent = t('indexStart');
+      const records = await rebuildVaultIndex((progress) => {
+        if (progress.done) els.indexStatus.textContent = t('indexingDone', { indexed: progress.indexed });
+        else els.indexStatus.textContent = t('scanProgress', { scanned: progress.scanned, indexed: progress.indexed });
+      });
+      els.indexStatus.textContent = t('indexingDone', { indexed: records.length });
+    } catch (error) {
+      showError(error);
+    }
   });
 }
 
 function fillForm(settings) {
   els.uiLanguage.value = settings.uiLanguage;
   els.vaultName.value = settings.vaultName;
-  els.defaultClipFolder.value = settings.defaultClipFolder;
-  els.webClipPathTemplate.value = settings.webClipPathTemplate;
-  els.assetFolder.value = settings.assetFolder;
-  els.maxImageBytes.value = String(settings.maxImageBytes);
   els.excludedFolders.value = settings.excludedFolders.join('\n');
   els.excludedTags.value = settings.excludedTags.join('\n');
 }
@@ -85,10 +90,6 @@ function readForm() {
   return {
     uiLanguage: els.uiLanguage.value === 'en' ? 'en' : 'ko',
     vaultName: els.vaultName.value.trim(),
-    defaultClipFolder: els.defaultClipFolder.value.trim() || 'Web Clips',
-    webClipPathTemplate: els.webClipPathTemplate.value.trim() || 'Web Clips/{{title}}.md',
-    assetFolder: els.assetFolder.value.trim() || '_assets/web-clips',
-    maxImageBytes: Number(els.maxImageBytes.value) || 8 * 1024 * 1024,
     excludedFolders: splitLines(els.excludedFolders.value),
     excludedTags: splitLines(els.excludedTags.value)
   };

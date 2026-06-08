@@ -4,16 +4,13 @@
 // - 현재 페이지 관련 노트 검색
 // - 결과를 간략히 보여주고 Obsidian 앱으로 직접 열기
 
-import { chooseVaultDirectory, getVaultDirectoryHandle, rebuildVaultIndex, loadVaultIndex, getVaultIndexCreatedAt, writeVaultTextFile } from '../lib/vault-access.js';
+import { chooseVaultDirectory, getVaultDirectoryHandle, rebuildVaultIndex, loadVaultIndex, getVaultIndexCreatedAt } from '../lib/vault-access.js';
 import { loadSettings, saveSettings } from '../lib/settings.js';
 import { applyTranslations, translate } from '../lib/i18n.js';
 import { searchVaultIndex } from '../lib/search-engine.js';
 import { normalizeTagInput } from '../lib/tag-utils.js';
 import { openInObsidian } from '../lib/obsidian-uri.js';
 import { detectSearchContext, buildDefaultQuery } from '../lib/page-context.js';
-import { buildObsidianClipperNote } from '../lib/obsidian-clipper-adapter.js';
-import { makeWebClipPath } from '../lib/web-clip-path.js';
-import { localizePageImages } from '../lib/image-localizer.js';
 
 const els = {
   status: document.querySelector('#status'),
@@ -25,7 +22,6 @@ const els = {
   queryInfo: document.querySelector('#query-info'),
   pageContext: document.querySelector('#page-context'),
   relatedSearch: document.querySelector('#related-search'),
-  clipCurrentPage: document.querySelector('#clip-current-page'),
   reindex: document.querySelector('#reindex'),
   results: document.querySelector('#results'),
   resultTemplate: document.querySelector('#result-template')
@@ -85,11 +81,6 @@ function bindEvents() {
     await runSearch('tag', els.query.value || state.pageContext?.selectedText || '');
   });
 
-  els.clipCurrentPage.addEventListener('click', async () => {
-    if (!guardVaultReady()) return;
-    await clipCurrentPageAsLocalNote();
-  });
-
   els.query.addEventListener('keydown', async (event) => {
     if (event.key === 'Enter' && guardVaultReady()) {
       await runSearch('tag', els.query.value);
@@ -140,7 +131,6 @@ function setVaultControlsEnabled(enabled) {
     els.searchTag,
     els.searchText,
     els.relatedSearch,
-    els.clipCurrentPage,
     els.reindex
   ]) {
     element.disabled = !enabled;
@@ -167,7 +157,7 @@ async function loadCurrentPageContext() {
   if (tab?.id && /^https?:/.test(tab.url || '')) {
     try {
       const response = await chrome.tabs.sendMessage(tab.id, { type: 'READ_PAGE_CONTEXT' });
-      if (response?.ok) context = { ...context, ...response.context };
+      if (response?.context) context = { ...context, ...response.context };
     } catch {
       // content script가 없는 chrome:// 또는 확장 페이지에서는 기본 탭 정보만 사용합니다.
     }
@@ -259,29 +249,6 @@ async function rebuildIndexWithProgress() {
   });
 }
 
-async function clipCurrentPageAsLocalNote() {
-  setStatus(t('savingPage'));
-
-  const settings = await loadSettings();
-  const imageResult = await localizePageImages({
-    pageContext: state.pageContext,
-    settings,
-    limit: 8
-  });
-
-  const note = await buildObsidianClipperNote({
-    pageContext: state.pageContext,
-    localImages: imageResult.assets
-  });
-
-  const path = makeWebClipPath(settings, note, state.pageContext);
-  await writeVaultTextFile(path, note.markdown);
-
-  setStatus(t('savedPath', { path }));
-  await openInObsidian({ vaultName: settings.vaultName, filePath: path });
-  await rebuildIndexWithProgress();
-}
-
 function renderPageContext(context) {
   els.pageContext.textContent = [
     `${t('titleLabel')}: ${context.title || ''}`,
@@ -336,7 +303,11 @@ function setStatus(text) {
 function showError(error) {
   console.error(error);
   setStatus(t('error'));
-  els.results.innerHTML = `<p class="muted">${error instanceof Error ? error.message : String(error)}</p>`;
+  els.results.textContent = '';
+  const node = document.createElement('p');
+  node.className = 'muted';
+  node.textContent = error instanceof Error ? error.message : String(error);
+  els.results.appendChild(node);
 }
 
 function applyLanguage() {

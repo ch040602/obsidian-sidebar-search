@@ -4,10 +4,6 @@
 export const DEFAULT_SETTINGS = {
   uiLanguage: 'ko',
   vaultName: '',
-  defaultClipFolder: 'Web Clips',
-  webClipPathTemplate: 'Web Clips/{{title}}.md',
-  assetFolder: '_assets/web-clips',
-  maxImageBytes: 8 * 1024 * 1024,
   excludedFolders: ['.obsidian', '.git', 'node_modules', 'Journal/Private', 'Finance', 'People'],
   excludedTags: ['private', 'secret', 'personal'],
   maxIndexedFileBytes: 512 * 1024

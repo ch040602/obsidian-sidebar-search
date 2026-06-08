@@ -1,4 +1,4 @@
-// 역할: REST API 없이 Obsidian Vault 폴더를 직접 읽고 쓰는 계층입니다.
+// 역할: REST API 없이 Obsidian Vault 폴더를 직접 읽는 계층입니다.
 // Chrome File System Access API의 DirectoryHandle을 사용합니다.
 // 사용자가 명시적으로 선택한 폴더만 접근하며, 이 핸들은 IndexedDB에 저장됩니다.
 
@@ -16,8 +16,8 @@ export async function chooseVaultDirectory() {
     throw new Error('이 Chrome 환경은 File System Access API의 showDirectoryPicker를 지원하지 않습니다.');
   }
 
-  const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-  await requestReadWritePermission(handle);
+  const handle = await window.showDirectoryPicker({ mode: 'read' });
+  await requestReadPermission(handle);
   await idbSet(VAULT_HANDLE_KEY, handle);
   return handle;
 }
@@ -33,22 +33,22 @@ export async function getVaultDirectoryHandle({ requestPermission = false } = {}
   if (!handle) return null;
 
   if (requestPermission) {
-    await requestReadWritePermission(handle);
+    await requestReadPermission(handle);
   } else {
-    const permission = await handle.queryPermission({ mode: 'readwrite' });
+    const permission = await handle.queryPermission({ mode: 'read' });
     if (permission !== 'granted') return null;
   }
 
   return handle;
 }
 
-export async function requestReadWritePermission(handle) {
-  const query = await handle.queryPermission({ mode: 'readwrite' });
+export async function requestReadPermission(handle) {
+  const query = await handle.queryPermission({ mode: 'read' });
   if (query === 'granted') return true;
 
-  const permission = await handle.requestPermission({ mode: 'readwrite' });
+  const permission = await handle.requestPermission({ mode: 'read' });
   if (permission !== 'granted') {
-    throw new Error('Vault 폴더 읽기/쓰기 권한이 필요합니다.');
+    throw new Error('Vault 폴더 읽기 권한이 필요합니다.');
   }
   return true;
 }
@@ -95,34 +95,6 @@ export async function getVaultIndexCreatedAt() {
   return (await idbGet(VAULT_INDEX_CREATED_AT_KEY)) || 0;
 }
 
-export async function readVaultTextFile(path) {
-  const root = await getVaultDirectoryHandle({ requestPermission: true });
-  if (!root) throw new Error('Vault 폴더가 선택되어 있지 않습니다.');
-
-  const fileHandle = await getFileHandleByPath(root, path, { create: false });
-  return (await fileHandle.getFile()).text();
-}
-
-export async function writeVaultTextFile(path, text) {
-  const root = await getVaultDirectoryHandle({ requestPermission: true });
-  if (!root) throw new Error('Vault 폴더가 선택되어 있지 않습니다.');
-
-  const fileHandle = await getFileHandleByPath(root, path, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(text);
-  await writable.close();
-}
-
-export async function writeVaultBinaryFile(path, bytes, contentType = 'application/octet-stream') {
-  const root = await getVaultDirectoryHandle({ requestPermission: true });
-  if (!root) throw new Error('Vault 폴더가 선택되어 있지 않습니다.');
-
-  const fileHandle = await getFileHandleByPath(root, path, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(new Blob([bytes], { type: contentType }));
-  await writable.close();
-}
-
 async function* walkMarkdownFiles(dirHandle, prefix, settings) {
   for await (const [name, handle] of dirHandle.entries()) {
     const path = prefix ? `${prefix}/${name}` : name;
@@ -150,16 +122,4 @@ function isExcludedFolder(path, name, excludedFolders) {
 export function shouldIndexParsedNote(note, settings) {
   const blocked = new Set((settings.excludedTags || []).map(normalizeTagForCompare));
   return !(note.tags || []).some((tag) => blocked.has(normalizeTagForCompare(tag)));
-}
-
-async function getFileHandleByPath(root, path, options) {
-  const parts = String(path).split('/').filter(Boolean);
-  const fileName = parts.pop();
-  let dir = root;
-
-  for (const part of parts) {
-    dir = await dir.getDirectoryHandle(part, { create: options.create });
-  }
-
-  return dir.getFileHandle(fileName, { create: options.create });
 }

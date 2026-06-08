@@ -1,7 +1,7 @@
 // 역할: File System Access API의 DirectoryHandle과 설정/인덱스를 IndexedDB에 저장합니다.
 // 이유: DirectoryHandle은 JSON으로 저장할 수 없지만, IndexedDB에는 structured clone 형태로 저장할 수 있습니다.
 
-const DB_NAME = 'obsidian-local-clipper-companion';
+const DB_NAME = 'obsidian-sidebar-search';
 const DB_VERSION = 1;
 const STORE = 'kv';
 

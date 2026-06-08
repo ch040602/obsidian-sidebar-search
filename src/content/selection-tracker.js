@@ -54,25 +54,21 @@ document.addEventListener('keyup', () => {
 if (chrome.runtime?.id) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'READ_PAGE_CONTEXT') {
-      sendResponse({
-        ok: true,
-        context: {
-          url: location.href,
-          title: document.title,
-          h1: document.querySelector('h1')?.innerText?.trim() || '',
-          description: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
-        canonicalUrl: document.querySelector('link[rel="canonical"]')?.href || '',
-        selectedText: readSelection(),
-        html: document.documentElement?.outerHTML || '',
-        images: Array.from(document.images).slice(0, 100).map((img) => ({
-            src: img.currentSrc || img.src,
-            alt: img.alt || ''
-          }))
-        }
-      });
+      sendResponse({ ok: true, context: buildBasicPageContext() });
       return true;
     }
 
     return false;
   });
+}
+
+function buildBasicPageContext() {
+  return {
+    url: location.href,
+    title: document.title,
+    h1: document.querySelector('h1')?.innerText?.trim() || '',
+    description: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+    canonicalUrl: document.querySelector('link[rel="canonical"]')?.href || '',
+    selectedText: readSelection()
+  };
 }

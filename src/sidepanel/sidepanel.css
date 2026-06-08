@@ -59,6 +59,34 @@ input {
   color: FieldText;
 }
 
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 8px;
+  padding: 8px;
+  background: Field;
+  color: FieldText;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  resize: vertical;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hidden {
+  display: none;
+}
+
 .topbar-actions {
   display: flex;
   gap: 6px;
