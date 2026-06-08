@@ -11,7 +11,8 @@ import { searchVaultIndex } from '../lib/search-engine.js';
 import { normalizeTagInput } from '../lib/tag-utils.js';
 import { openInObsidian } from '../lib/obsidian-uri.js';
 import { detectSearchContext, buildDefaultQuery } from '../lib/page-context.js';
-import { buildBasicWebClipNote, makeClipPath } from '../lib/basic-clipper.js';
+import { buildObsidianClipperNote } from '../lib/obsidian-clipper-adapter.js';
+import { makeWebClipPath } from '../lib/web-clip-path.js';
 import { localizePageImages } from '../lib/image-localizer.js';
 
 const els = {
@@ -268,12 +269,12 @@ async function clipCurrentPageAsLocalNote() {
     limit: 8
   });
 
-  const note = buildBasicWebClipNote({
+  const note = await buildObsidianClipperNote({
     pageContext: state.pageContext,
     localImages: imageResult.assets
   });
 
-  const path = makeClipPath(settings.defaultClipFolder, note.title);
+  const path = makeWebClipPath(settings, note, state.pageContext);
   await writeVaultTextFile(path, note.markdown);
 
   setStatus(t('savedPath', { path }));

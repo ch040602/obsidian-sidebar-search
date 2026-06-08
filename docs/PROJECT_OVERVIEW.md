@@ -29,7 +29,9 @@
 | Search engine | `src/lib/search-engine.js` | 태그/본문/관련 노트 검색 |
 | Side panel | `src/sidepanel/sidepanel.js` | 검색 UI와 Obsidian 열기 |
 | Options | `src/options/options.js` | Vault 선택, 인덱스 재생성, 필터 설정 |
-| Basic clipper | `src/lib/basic-clipper.js` | upstream Clipper 연결 전 기본 저장 |
+| Obsidian clipper adapter | `src/lib/obsidian-clipper-adapter.js` | 공식 Obsidian Web Clipper API bundle 호출 |
+| Basic clipper | `src/lib/basic-clipper.js` | upstream 추출 실패 시 fallback 저장 |
+| Web clip path | `src/lib/web-clip-path.js` | 웹 클립 저장 경로 템플릿 렌더링 |
 | Image localizer | `src/lib/image-localizer.js` | 이미지 로컬 저장 기초 구현 |
 
 ## REST API를 쓰지 않는 이유
@@ -96,4 +98,4 @@ git fetch obsidian-clipper main --tags
 git subtree add --prefix=vendor/obsidian-clipper obsidian-clipper main --squash
 ```
 
-MVP zip에는 네트워크 없이 실행 가능한 기본 클리핑 모듈을 포함했습니다. 공식 Clipper API 연결은 후속 단계에서 `src/lib/basic-clipper.js`를 `vendor/obsidian-clipper/src/api.ts` adapter로 교체하는 방식입니다.
+현재 구현은 `vendor/obsidian-clipper/src/api.ts`를 browser ESM bundle인 `vendor/obsidian-clipper/dist/api.browser.mjs`로 빌드한 뒤 `src/lib/obsidian-clipper-adapter.js`에서 호출합니다. 사용자는 Options에서 `Web Clips/{{title}}.md` 같은 웹 클립 저장 경로 템플릿을 설정할 수 있습니다.

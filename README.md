@@ -9,8 +9,8 @@ REST API 없이 Chrome 확장 프로그램이 사용자가 선택한 Obsidian Va
 - Vault 폴더를 File System Access API로 직접 선택하고 IndexedDB에 DirectoryHandle 저장
 - Markdown frontmatter `tags`, `aliases`, `source_url` 및 본문 태그를 인덱싱
 - 검색 결과를 간단히 확인한 뒤 `obsidian://open` URI로 Obsidian 앱에서 직접 열기
-- 현재 페이지를 간단한 Markdown 노트로 저장하고 원격 이미지를 Vault 내부 `_assets` 폴더에 저장하는 기초 파이프라인 포함
-- 공식 Obsidian Web Clipper는 `git subtree`로 `vendor/obsidian-clipper/`에 포함하도록 설계
+- 현재 페이지를 공식 Obsidian Web Clipper API adapter로 Markdown 노트로 저장하고 원격 이미지를 Vault 내부 `_assets` 폴더에 저장
+- 공식 Obsidian Web Clipper는 `git subtree`로 `vendor/obsidian-clipper/`에 포함
 
 ## 설치 및 테스트
 
@@ -34,15 +34,37 @@ Chrome에서 수동 확인:
 
 ## subtree 추가
 
-이 zip에는 네트워크 접근 없이 실행 가능한 자체 접근/검색 스캐폴드가 들어 있습니다. 공식 Obsidian Web Clipper 소스는 아래 명령으로 직접 추가합니다.
+공식 Obsidian Web Clipper 소스는 `vendor/obsidian-clipper/`에 subtree로 포함되어 있습니다. 업데이트는 아래 명령으로 수행합니다.
 
 ```bash
-git remote add obsidian-clipper https://github.com/obsidianmd/obsidian-clipper.git
 git fetch obsidian-clipper main --tags
-git subtree add --prefix=vendor/obsidian-clipper obsidian-clipper main --squash
+git subtree pull --prefix=vendor/obsidian-clipper obsidian-clipper main --squash
 ```
 
-이후 `src/lib/basic-clipper.js`를 upstream adapter로 교체하면 공식 Clipper 추출 결과를 그대로 받아 로컬 이미지 저장 파이프라인에 연결할 수 있습니다.
+subtree 업데이트 후 browser bundle을 다시 만듭니다.
+
+```bash
+npm install --prefix vendor/obsidian-clipper
+npm run build:clipper-api
+```
+
+현재 페이지 저장은 `src/lib/obsidian-clipper-adapter.js`가 `vendor/obsidian-clipper/dist/api.browser.mjs`의 공식 `clip()` API를 호출합니다. upstream 추출 결과가 비어 있거나 현재 탭 HTML을 얻을 수 없으면 `src/lib/basic-clipper.js` fallback으로 저장합니다.
+
+## 웹 클립 저장 경로
+
+Options의 `웹 클립 저장 경로`에서 저장 위치를 설정합니다.
+
+```text
+Web Clips/{{title}}.md
+Clips/{{domain}}/{{date}} - {{title}}.md
+```
+
+지원 변수:
+
+- `{{title}}`
+- `{{date}}`
+- `{{datetime}}`
+- `{{domain}}`
 
 ## 보안 원칙
 

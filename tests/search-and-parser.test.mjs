@@ -8,6 +8,8 @@ import { normalizeTagInput, tagVariantsFromSelection } from '../src/lib/tag-util
 import { normalizeUrl, domainFromUrl } from '../src/lib/url-utils.js';
 import { shouldIndexParsedNote } from '../src/lib/vault-access.js';
 import { normalizeLanguage, translate } from '../src/lib/i18n.js';
+import { makeWebClipPath } from '../src/lib/web-clip-path.js';
+import { buildObsidianClipperNote } from '../src/lib/obsidian-clipper-adapter.js';
 
 globalThis.chrome = {
   storage: {
@@ -262,4 +264,30 @@ test('translates UI labels for Korean and English language choices', () => {
   assert.equal(normalizeLanguage('unknown'), 'ko');
   assert.equal(translate('ko', 'tagResults', { tag: 'web-clipper', count: 2 }), '실제 태그 검색: #web-clipper · 2개 결과');
   assert.equal(translate('en', 'tagResults', { tag: 'web-clipper', count: 2 }), 'Actual tag search: #web-clipper · 2 results');
+});
+
+test('builds configurable web clip save paths safely', () => {
+  const path = makeWebClipPath(
+    { webClipPathTemplate: 'Clips/{{domain}}/{{date}} - {{title}}' },
+    { title: 'A/B: C?' },
+    { url: 'https://www.example.com/post' }
+  );
+
+  assert.match(path, /^Clips\/example\.com\/\d{4}-\d{2}-\d{2} - A-B- C-\.md$/);
+});
+
+test('obsidian clipper adapter falls back when full page html is unavailable', async () => {
+  const note = await buildObsidianClipperNote({
+    pageContext: {
+      title: 'Fallback Page',
+      url: 'https://example.com',
+      description: 'Short description',
+      selectedText: 'Selected text'
+    },
+    localImages: []
+  });
+
+  assert.equal(note.engine, 'basic-fallback');
+  assert.equal(note.title, 'Fallback Page');
+  assert.match(note.markdown, /source_url: "https:\/\/example\.com"/);
 });

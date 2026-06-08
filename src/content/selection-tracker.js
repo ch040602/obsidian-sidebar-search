@@ -61,9 +61,10 @@ if (chrome.runtime?.id) {
           title: document.title,
           h1: document.querySelector('h1')?.innerText?.trim() || '',
           description: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
-          canonicalUrl: document.querySelector('link[rel="canonical"]')?.href || '',
-          selectedText: readSelection(),
-          images: Array.from(document.images).slice(0, 100).map((img) => ({
+        canonicalUrl: document.querySelector('link[rel="canonical"]')?.href || '',
+        selectedText: readSelection(),
+        html: document.documentElement?.outerHTML || '',
+        images: Array.from(document.images).slice(0, 100).map((img) => ({
             src: img.currentSrc || img.src,
             alt: img.alt || ''
           }))

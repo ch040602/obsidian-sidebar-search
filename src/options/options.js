@@ -13,6 +13,7 @@ const els = {
   vaultStatus: document.querySelector('#vault-status'),
   vaultName: document.querySelector('#vault-name'),
   defaultClipFolder: document.querySelector('#default-clip-folder'),
+  webClipPathTemplate: document.querySelector('#web-clip-path-template'),
   assetFolder: document.querySelector('#asset-folder'),
   maxImageBytes: document.querySelector('#max-image-bytes'),
   excludedFolders: document.querySelector('#excluded-folders'),
@@ -73,6 +74,7 @@ function fillForm(settings) {
   els.uiLanguage.value = settings.uiLanguage;
   els.vaultName.value = settings.vaultName;
   els.defaultClipFolder.value = settings.defaultClipFolder;
+  els.webClipPathTemplate.value = settings.webClipPathTemplate;
   els.assetFolder.value = settings.assetFolder;
   els.maxImageBytes.value = String(settings.maxImageBytes);
   els.excludedFolders.value = settings.excludedFolders.join('\n');
@@ -84,6 +86,7 @@ function readForm() {
     uiLanguage: els.uiLanguage.value === 'en' ? 'en' : 'ko',
     vaultName: els.vaultName.value.trim(),
     defaultClipFolder: els.defaultClipFolder.value.trim() || 'Web Clips',
+    webClipPathTemplate: els.webClipPathTemplate.value.trim() || 'Web Clips/{{title}}.md',
     assetFolder: els.assetFolder.value.trim() || '_assets/web-clips',
     maxImageBytes: Number(els.maxImageBytes.value) || 8 * 1024 * 1024,
     excludedFolders: splitLines(els.excludedFolders.value),

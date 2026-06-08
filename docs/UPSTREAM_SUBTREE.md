@@ -13,6 +13,8 @@ git subtree add --prefix=vendor/obsidian-clipper obsidian-clipper main --squash
 ```bash
 git fetch obsidian-clipper main --tags
 git subtree pull --prefix=vendor/obsidian-clipper obsidian-clipper main --squash
+npm install --prefix vendor/obsidian-clipper
+npm run build:clipper-api
 ```
 
 ## 정책
