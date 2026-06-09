@@ -17,3 +17,16 @@ export async function loadSettings() {
 export async function saveSettings(settings) {
   await chrome.storage.local.set({ settings: { ...DEFAULT_SETTINGS, ...settings } });
 }
+
+export function privacyIndexSettingsChanged(before, after) {
+  return settingsListFingerprint(before?.excludedFolders) !== settingsListFingerprint(after?.excludedFolders) ||
+    settingsListFingerprint(before?.excludedTags) !== settingsListFingerprint(after?.excludedTags);
+}
+
+function settingsListFingerprint(values) {
+  return Array.from(new Set((values || [])
+    .map((value) => String(value).trim().toLowerCase())
+    .filter(Boolean)))
+    .sort()
+    .join('\n');
+}

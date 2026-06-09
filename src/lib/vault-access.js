@@ -6,6 +6,7 @@ import { idbGet, idbSet, idbDelete } from './idb-store.js';
 import { loadSettings } from './settings.js';
 import { parseMarkdownNote } from './markdown-parser.js';
 import { normalizeTagForCompare } from './tag-utils.js';
+import { buildSemanticSearchMetadata } from './semantic-search.js';
 
 const VAULT_HANDLE_KEY = 'vaultDirectoryHandle';
 const VAULT_INDEX_KEY = 'vaultIndex';
@@ -24,6 +25,10 @@ export async function chooseVaultDirectory() {
 
 export async function forgetVaultDirectory() {
   await idbDelete(VAULT_HANDLE_KEY);
+  await purgeVaultIndex();
+}
+
+export async function purgeVaultIndex() {
   await idbDelete(VAULT_INDEX_KEY);
   await idbDelete(VAULT_INDEX_CREATED_AT_KEY);
 }
@@ -77,7 +82,7 @@ export async function rebuildVaultIndex(onProgress = () => {}) {
 
     if (!shouldIndexParsedNote(note, settings)) continue;
 
-    records.push(note);
+    records.push(buildIndexedNoteRecord(note));
   }
 
   await idbSet(VAULT_INDEX_KEY, records);
@@ -122,4 +127,11 @@ function isExcludedFolder(path, name, excludedFolders) {
 export function shouldIndexParsedNote(note, settings) {
   const blocked = new Set((settings.excludedTags || []).map(normalizeTagForCompare));
   return !(note.tags || []).some((tag) => blocked.has(normalizeTagForCompare(tag)));
+}
+
+export function buildIndexedNoteRecord(note) {
+  return {
+    ...note,
+    semanticSearch: buildSemanticSearchMetadata(note)
+  };
 }

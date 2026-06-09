@@ -4,9 +4,11 @@ import assert from 'node:assert/strict';
 import { parseMarkdownNote, splitFrontmatter } from '../src/lib/markdown-parser.js';
 import { buildObsidianOpenUri } from '../src/lib/obsidian-uri.js';
 import { searchVaultIndex } from '../src/lib/search-engine.js';
+import { buildSemanticSearchMetadata, embedLocalText, searchSemanticNotes, stableNoteId } from '../src/lib/semantic-search.js';
+import { privacyIndexSettingsChanged } from '../src/lib/settings.js';
 import { normalizeTagInput, tagVariantsFromSelection } from '../src/lib/tag-utils.js';
 import { normalizeUrl, domainFromUrl } from '../src/lib/url-utils.js';
-import { shouldIndexParsedNote } from '../src/lib/vault-access.js';
+import { buildIndexedNoteRecord, shouldIndexParsedNote } from '../src/lib/vault-access.js';
 import { normalizeLanguage, translate } from '../src/lib/i18n.js';
 
 globalThis.chrome = {
@@ -172,6 +174,239 @@ test('text search also matches tag variants from selected words', async () => {
 
   assert.equal(results[0].path, 'Public/Machine Learning.md');
   assert.ok(results[0].reasons.includes('#machine-learning 태그 일치'));
+});
+
+test('text search uses BM25-style word scoring instead of substring-only matches', async () => {
+  const index = [
+    {
+      path: 'Public/Exact Retrieval.md',
+      title: 'Retrieval Systems',
+      tags: [],
+      aliases: [],
+      headings: ['Retrieval architecture'],
+      excerpt: 'retrieval retrieval retrieval ranking',
+      contentText: 'retrieval retrieval retrieval ranking',
+      mtime: 1
+    },
+    {
+      path: 'Public/String Noise.md',
+      title: 'Irrelevant',
+      tags: [],
+      aliases: [],
+      headings: [],
+      excerpt: 'pretrieval substring should not dominate',
+      contentText: 'pretrieval substring should not dominate',
+      mtime: 5
+    }
+  ];
+
+  const results = await searchVaultIndex(index, {
+    mode: 'text',
+    query: 'retrieval',
+    limit: 10
+  });
+
+  assert.equal(results[0].path, 'Public/Exact Retrieval.md');
+  assert.ok(results[0].reasons.some((reason) => reason.includes('BM25')));
+  assert.equal(results.some((result) => result.path === 'Public/String Noise.md'), false);
+});
+
+test('text search includes local semantic vector matches without sending note text away', async () => {
+  const index = [
+    {
+      path: 'Public/Systems.md',
+      title: 'Systems',
+      tags: [],
+      aliases: [],
+      headings: ['Model notes'],
+      excerpt: 'artificial intelligence models and evaluation',
+      contentText: 'artificial intelligence models and evaluation',
+      mtime: 2
+    },
+    {
+      path: 'Public/Cooking.md',
+      title: 'Cooking',
+      tags: [],
+      aliases: [],
+      headings: [],
+      excerpt: 'recipe timing and ingredients',
+      contentText: 'recipe timing and ingredients',
+      mtime: 3
+    },
+    {
+      path: 'Private/Hidden.md',
+      title: 'Hidden',
+      tags: [],
+      aliases: [],
+      headings: [],
+      excerpt: 'artificial intelligence private note',
+      contentText: 'artificial intelligence private note',
+      mtime: 4
+    }
+  ];
+
+  const results = await searchVaultIndex(index, {
+    mode: 'text',
+    query: 'AI',
+    limit: 10
+  });
+
+  assert.equal(results[0].path, 'Public/Systems.md');
+  assert.ok(results[0].reasons.some((reason) => reason.startsWith('로컬 의미 벡터 유사도')));
+  assert.equal(results.some((result) => result.path.startsWith('Private/')), false);
+});
+
+test('related search uses local semantic vectors when URL and lexical clues are weak', async () => {
+  const index = [
+    {
+      path: 'Public/Metadata.md',
+      title: 'Metadata taxonomy',
+      tags: ['knowledge-management'],
+      aliases: [],
+      headings: [],
+      excerpt: 'labels and metadata for organizing notes',
+      contentText: 'labels and metadata for organizing notes',
+      normalizedSourceUrls: [],
+      domains: [],
+      mtime: 1
+    }
+  ];
+
+  const results = await searchVaultIndex(index, {
+    mode: 'related',
+    pageContext: {
+      url: 'https://example.com/unmatched',
+      title: 'Tag strategy',
+      description: ''
+    },
+    limit: 10
+  });
+
+  assert.equal(results[0].path, 'Public/Metadata.md');
+  assert.ok(results[0].reasons.some((reason) => reason.startsWith('로컬 의미 벡터 유사도')));
+});
+
+test('local semantic index follows turbovec-style ids and allowlist filtering', () => {
+  const index = [
+    {
+      path: 'Public/Allowed.md',
+      title: 'Allowed',
+      aliases: [],
+      tags: [],
+      headings: [],
+      excerpt: 'artificial intelligence',
+      contentText: 'artificial intelligence'
+    },
+    {
+      path: 'Public/Blocked.md',
+      title: 'Blocked',
+      aliases: [],
+      tags: [],
+      headings: [],
+      excerpt: 'artificial intelligence',
+      contentText: 'artificial intelligence'
+    }
+  ];
+  const queryVector = embedLocalText('AI');
+
+  assert.equal(queryVector.length, 128);
+  assert.equal(typeof stableNoteId('Public/Allowed.md'), 'bigint');
+  assert.ok(stableNoteId('Public/Allowed.md') > 0xffffffffn);
+
+  const results = searchSemanticNotes(index, 'AI', {
+    allowPaths: ['Public/Allowed.md'],
+    limit: 10
+  });
+
+  assert.deepEqual(results.map((result) => result.note.path), ['Public/Allowed.md']);
+});
+
+test('local embedding path does not call network APIs', async () => {
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    throw new Error('network should not be used for local semantic search');
+  };
+
+  try {
+    const results = searchSemanticNotes([
+      {
+        path: 'Public/Local.md',
+        title: 'Local AI note',
+        aliases: [],
+        tags: [],
+        headings: [],
+        excerpt: 'artificial intelligence',
+        contentText: 'artificial intelligence'
+      }
+    ], 'AI', { limit: 5 });
+
+    assert.equal(results[0].note.path, 'Public/Local.md');
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('indexed note records persist semantic metadata for reuse during search', () => {
+  const note = parseMarkdownNote({
+    path: 'Public/Semantic.md',
+    markdown: '# Semantic\nartificial intelligence retrieval'
+  });
+
+  const record = buildIndexedNoteRecord(note);
+
+  assert.equal(record.semanticSearch.version, 1);
+  assert.equal(typeof record.semanticSearch.id, 'string');
+  assert.equal(record.semanticSearch.dimensions, 128);
+  assert.equal(record.semanticSearch.vector.length, 128);
+  assert.ok(record.semanticSearch.vector.some((value) => value !== 0));
+});
+
+test('privacy filter changes invalidate the persisted vault index', () => {
+  const before = {
+    excludedFolders: ['Private', '.git'],
+    excludedTags: ['secret']
+  };
+
+  assert.equal(privacyIndexSettingsChanged(before, {
+    excludedFolders: ['.git', 'private'],
+    excludedTags: ['SECRET']
+  }), false);
+
+  assert.equal(privacyIndexSettingsChanged(before, {
+    excludedFolders: ['Private', '.git', 'Archive'],
+    excludedTags: ['secret']
+  }), true);
+
+  assert.equal(privacyIndexSettingsChanged(before, {
+    excludedFolders: ['Private', '.git'],
+    excludedTags: ['secret', 'personal']
+  }), true);
+});
+
+test('semantic search reuses persisted vectors when present', () => {
+  const semanticSource = {
+    path: 'Public/Reused.md',
+    title: 'AI source',
+    aliases: [],
+    tags: [],
+    headings: [],
+    excerpt: 'artificial intelligence',
+    contentText: 'artificial intelligence'
+  };
+  const note = {
+    ...semanticSource,
+    title: 'Cooking note',
+    excerpt: 'recipe ingredients',
+    contentText: 'recipe ingredients',
+    semanticSearch: buildSemanticSearchMetadata(semanticSource)
+  };
+
+  const results = searchSemanticNotes([note], 'AI', { limit: 5 });
+
+  assert.equal(results[0].note.path, 'Public/Reused.md');
 });
 
 test('blocks excluded-tag notes before index persistence', () => {

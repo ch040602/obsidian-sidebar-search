@@ -10,6 +10,8 @@ Obsidian Sidebar Search는 사용자가 직접 선택한 Obsidian Vault 폴더�
 - 웹페이지에서 드래그한 텍스트를 실제 Obsidian 태그로 검색
 - `#research`와 `research`가 같은 태그 결과를 반환하도록 정규화
 - 태그 검색에서는 본문 검색 결과를 섞지 않고 실제 태그만 표시
+- 전체/관련 노트 검색에서 로컬 의미 벡터를 사용해 어휘가 다른 관련 노트도 함께 순위화
+- 본문 검색의 어휘 점수는 단순 substring이 아니라 BM25 스타일 단어 점수로 계산
 - 현재 페이지 URL/domain 기준 관련 노트 검색
 - `obsidian://open` URI로 Obsidian 앱에서 노트 열기
 - 사용자가 승인한 Vault 디렉터리 핸들을 IndexedDB에 저장
@@ -37,8 +39,10 @@ Obsidian Sidebar Search는 사용자가 직접 선택한 Obsidian Vault 폴더�
 ## 검색 방식
 
 - `태그`는 frontmatter와 본문 `#tag`에서 파싱한 실제 Obsidian 태그만 검색합니다.
-- `전체`는 제목, 별칭, 헤딩, 태그, 발췌문, 본문을 검색합니다.
-- `관련 노트`는 현재 페이지 URL/domain과 연결된 노트를 검색합니다.
+- `전체`는 제목, 별칭, 헤딩, 태그, 발췌문, 본문을 BM25 스타일 로컬 어휘 점수로 검색한 뒤 로컬 의미 벡터 점수를 함께 반영합니다.
+- `관련 노트`는 현재 페이지 URL/domain과 연결된 노트를 우선하고, 페이지 제목/설명/선택 텍스트의 BM25 어휘 점수와 Vault 노트의 로컬 의미 벡터 유사도를 함께 사용합니다.
+- 인덱스 재생성 중 포함 대상 노트마다 stable 64-bit note id, vector dimensions, version, local vector를 포함하는 semantic metadata를 저장합니다. 제외 폴더와 제외 태그는 이 metadata 저장 전에 먼저 적용됩니다.
+- 의미 검색은 `src/lib/semantic-search.js`의 로컬 해시 임베딩과 `IdMapIndex` 형태의 allowlist 검색 어댑터로 동작합니다. 이는 `turbovec`의 stable id/allowlist 계약에 맞춘 브라우저 로컬 백엔드이며, 실제 `turbovec` Rust/Python 엔진은 MV3 호환 WASM 또는 네이티브 브리지 빌드가 확보되면 같은 경계에서 교체할 수 있습니다.
 - 우클릭 메뉴의 `Obsidian 태그로 검색: "%s"`는 선택 텍스트를 사이드패널 태그 검색어로 넘깁니다.
 
 ## 프라이버시
@@ -49,6 +53,9 @@ Obsidian Sidebar Search는 사용자가 직접 선택한 Obsidian Vault 폴더�
 - Vault 디렉터리 핸들은 웹페이지에 노출하지 않습니다.
 - 제외 폴더는 인덱싱 중 건너뜁니다.
 - 제외 태그는 인덱스 저장 전과 결과 표시 전에 다시 필터링합니다.
+- 제외 폴더나 제외 태그 설정을 바꾸면 기존 Vault 인덱스를 삭제해 이전 프라이버시 규칙으로 저장된 노트 본문과 semantic vector가 남지 않게 합니다.
+- 의미 검색 임베딩은 브라우저 확장 컨텍스트 안에서만 계산하며 네트워크 API를 호출하지 않습니다.
+- 저장된 semantic vector는 Vault 인덱스와 함께 IndexedDB에 로컬로만 저장됩니다.
 
 ## 개발
 

@@ -27,6 +27,8 @@ Primary flow:
 | IndexedDB store | `src/lib/idb-store.js` | Stores the DirectoryHandle and local search index |
 | Markdown parser | `src/lib/markdown-parser.js` | Extracts Obsidian note metadata |
 | Search engine | `src/lib/search-engine.js` | Runs tag, full-text, and current-page related search |
+| Lexical search | `src/lib/lexical-search.js` | Scores full-text candidates with BM25-style token matching and field weights |
+| Semantic search | `src/lib/semantic-search.js` | Builds local hashed embeddings and runs turbovec-style stable-id/allowlist vector search |
 | Side panel | `src/sidepanel/sidepanel.js` | Renders search controls, results, and Obsidian open actions |
 | Options | `src/options/options.js` | Manages Vault selection, language, filters, and index rebuilds |
 
@@ -73,6 +75,22 @@ This note also contains #machine-learning inline.
 
 `#tag` and `tag` input are treated the same, but partial words do not match longer tags in tag mode.
 
+## Semantic Search
+
+Full-text and related-note modes use a hybrid ranking path:
+
+```text
+1. Apply excluded folder/tag filtering before scoring.
+2. Run BM25-style lexical title/alias/heading/body scoring and strict actual-tag boosts.
+3. Reuse persisted local note vectors when available, or compute a local vector fallback.
+4. Search an IdMapIndex-style local vector adapter with stable 64-bit note IDs.
+5. Merge semantic similarity into the lexical score.
+```
+
+The current backend is intentionally browser-local JavaScript, because the public turbovec package surfaces are Rust and Python rather than Chrome MV3-ready JavaScript. The adapter keeps the same conceptual boundary turbovec needs: stable external IDs and allowlist-filtered search. When an MV3-compatible turbovec WASM build or approved local bridge exists, it should replace the adapter behind `src/lib/semantic-search.js` without changing content-script or side-panel privacy boundaries.
+
+Vault index rebuild persists semantic metadata for included notes only. Each record stores a semantic version, stable id, vector dimensions, and local vector so searches do not need to rebuild note embeddings from text every time.
+
 ## Obsidian Open URI
 
 Search result buttons generate:
@@ -90,3 +108,4 @@ The Vault name is optional and can be set in Options. If it is blank, Obsidian c
 - Search results are not injected into host page DOM.
 - Excluded folders are skipped during indexing.
 - Excluded tags are filtered before index persistence and before display.
+- Semantic embeddings are computed locally and are not sent to a remote embedding service.

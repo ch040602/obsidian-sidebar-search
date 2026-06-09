@@ -4,6 +4,10 @@
 import { normalizeTagForCompare, tagVariantsFromSelection } from './tag-utils.js';
 import { normalizeUrl, domainFromUrl } from './url-utils.js';
 import { loadSettings } from './settings.js';
+import { searchSemanticNotes } from './semantic-search.js';
+import { scoreLexicalNotes, tokenizeLexical } from './lexical-search.js';
+
+const SEMANTIC_SCORE_WEIGHT = 260;
 
 export async function searchVaultIndex(index, request) {
   const settings = await loadSettings();
@@ -14,10 +18,10 @@ export async function searchVaultIndex(index, request) {
   }
 
   if (request.mode === 'related') {
-    return searchRelated(safeIndex, request).slice(0, request.limit || 25);
+    return searchRelatedHybrid(safeIndex, request).slice(0, request.limit || 25);
   }
 
-  return searchText(safeIndex, request.query, request).slice(0, request.limit || 25);
+  return searchTextHybrid(safeIndex, request.query, request).slice(0, request.limit || 25);
 }
 
 export function searchByTag(index, rawText, request = {}) {
@@ -51,24 +55,25 @@ export function searchByTag(index, rawText, request = {}) {
 export function searchText(index, query, request = {}) {
   const tokens = tokenize(query);
   const variants = tagVariantsFromSelection(query);
-  const results = [];
+  const resultsByPath = new Map();
+
+  for (const result of scoreLexicalNotes(index, query)) {
+    resultsByPath.set(result.note.path, toRankedResult(result.note, result.score, result.reasons));
+  }
 
   for (const note of index) {
-    const reasons = [];
-    let score = scoreTitleAliasContent(note, tokens, reasons, 1);
-
     for (const tag of note.tags || []) {
       const normalizedTag = normalizeTagForCompare(tag);
       if (tokens.includes(normalizedTag) || variants.includes(normalizedTag)) {
-        score += 220;
-        reasons.push(`#${tag} 태그 일치`);
+        const existing = resultsByPath.get(note.path) || toRankedResult(note, 0, []);
+        existing.score += 220;
+        existing.reasons = Array.from(new Set([...(existing.reasons || []), `#${tag} 태그 일치`])).slice(0, 5);
+        resultsByPath.set(note.path, existing);
       }
     }
-
-    if (score > 0) results.push(toRankedResult(note, score, reasons));
   }
 
-  return sortResults(results);
+  return sortResults(Array.from(resultsByPath.values()));
 }
 
 export function searchRelated(index, request) {
@@ -76,7 +81,8 @@ export function searchRelated(index, request) {
   const url = normalizeUrl(page.url || '');
   const canonicalUrl = normalizeUrl(page.canonicalUrl || '');
   const domain = domainFromUrl(page.url || '');
-  const tokens = tokenize([page.selectedText, page.searchQuery, page.h1, page.title, page.description].filter(Boolean).join(' '));
+  const query = [page.selectedText, page.searchQuery, page.h1, page.title, page.description].filter(Boolean).join(' ');
+  const lexicalByPath = new Map(scoreLexicalNotes(index, query, { multiplier: 0.8 }).map((result) => [result.note.path, result]));
 
   const results = [];
 
@@ -99,7 +105,11 @@ export function searchRelated(index, request) {
       reasons.push(`같은 도메인: ${domain}`);
     }
 
-    score += scoreTitleAliasContent(note, tokens, reasons, 0.8);
+    const lexical = lexicalByPath.get(note.path);
+    if (lexical) {
+      score += lexical.score;
+      reasons.push(...lexical.reasons);
+    }
 
     if (score > 0) results.push(toRankedResult(note, score, reasons));
   }
@@ -107,48 +117,64 @@ export function searchRelated(index, request) {
   return sortResults(results);
 }
 
-function scoreTitleAliasContent(note, tokens, reasons, multiplier) {
-  if (!tokens.length) return 0;
-  let score = 0;
-  const title = normalizeText(note.title);
-  const aliases = (note.aliases || []).map(normalizeText).join(' ');
-  const headings = (note.headings || []).map(normalizeText).join(' ');
-  const content = normalizeText(`${note.excerpt || ''} ${note.contentText || ''}`);
+function searchTextHybrid(index, query, request = {}) {
+  const lexicalResults = searchText(index, query, request);
+  const semanticResults = searchSemanticNotes(index, query, {
+    limit: Math.max(request.limit || 25, 50)
+  });
 
-  for (const token of tokens) {
-    if (title.includes(token)) {
-      score += 180 * multiplier;
-      reasons.push(`제목에 "${token}" 포함`);
-    }
-    if (aliases.includes(token)) {
-      score += 160 * multiplier;
-      reasons.push(`alias에 "${token}" 포함`);
-    }
-    if (headings.includes(token)) {
-      score += 90 * multiplier;
-      reasons.push(`heading에 "${token}" 포함`);
-    }
-    if (content.includes(token)) {
-      score += 35 * multiplier;
-    }
+  return mergeSemanticResults(lexicalResults, semanticResults);
+}
+
+function searchRelatedHybrid(index, request) {
+  const lexicalResults = searchRelated(index, request);
+  const page = request.pageContext || {};
+  const semanticQuery = [
+    page.selectedText,
+    page.searchQuery,
+    page.h1,
+    page.title,
+    page.description,
+    request.query
+  ].filter(Boolean).join(' ');
+
+  const semanticResults = searchSemanticNotes(index, semanticQuery, {
+    limit: Math.max(request.limit || 25, 50),
+    threshold: 0.16
+  });
+
+  return mergeSemanticResults(lexicalResults, semanticResults);
+}
+
+function mergeSemanticResults(lexicalResults, semanticResults) {
+  const byPath = new Map();
+
+  for (const result of lexicalResults) {
+    byPath.set(result.path, {
+      ...result,
+      reasons: [...(result.reasons || [])]
+    });
   }
 
-  return score;
+  for (const result of semanticResults) {
+    const semanticScore = Math.round(result.similarity * SEMANTIC_SCORE_WEIGHT);
+    const reason = `로컬 의미 벡터 유사도 ${result.similarity.toFixed(2)}`;
+    const existing = byPath.get(result.note.path);
+
+    if (existing) {
+      existing.score += semanticScore;
+      existing.reasons = Array.from(new Set([...(existing.reasons || []), reason])).slice(0, 5);
+      continue;
+    }
+
+    byPath.set(result.note.path, toRankedResult(result.note, semanticScore, [reason]));
+  }
+
+  return sortResults(Array.from(byPath.values()));
 }
 
 function tokenize(text) {
-  return Array.from(new Set(String(text || '')
-    .toLowerCase()
-    .replace(/^#+/, '')
-    .replace(/[`*_~()[\]{}<>"'.,!?;:|\\/]/g, ' ')
-    .split(/\s+|-/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2)
-    .slice(0, 20)));
-}
-
-function normalizeText(text) {
-  return String(text || '').toLowerCase();
+  return Array.from(new Set(tokenizeLexical(text).slice(0, 20)));
 }
 
 function toRankedResult(note, score, reasons) {

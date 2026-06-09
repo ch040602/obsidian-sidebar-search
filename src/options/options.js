@@ -1,8 +1,8 @@
 // 역할: 확장 프로그램 설정 페이지입니다.
 // 사용자는 이 페이지에서 Vault 폴더를 선택하고, 권한을 확인하고, 인덱스를 재생성합니다.
 
-import { chooseVaultDirectory, forgetVaultDirectory, getVaultDirectoryHandle, rebuildVaultIndex } from '../lib/vault-access.js';
-import { loadSettings, saveSettings } from '../lib/settings.js';
+import { chooseVaultDirectory, forgetVaultDirectory, getVaultDirectoryHandle, purgeVaultIndex, rebuildVaultIndex } from '../lib/vault-access.js';
+import { loadSettings, privacyIndexSettingsChanged, saveSettings } from '../lib/settings.js';
 import { applyTranslations, translate } from '../lib/i18n.js';
 
 const els = {
@@ -31,8 +31,9 @@ async function init() {
 
   els.uiLanguage.addEventListener('change', async () => {
     try {
+      const previousSettings = currentSettings;
       currentSettings = { ...currentSettings, ...readForm() };
-      await saveSettings(currentSettings);
+      await saveSettingsAndMaybePurgeIndex(previousSettings, currentSettings);
       applyTranslations(document, currentSettings.uiLanguage);
       await refreshVaultStatus();
     } catch (error) {
@@ -53,11 +54,12 @@ async function init() {
   els.testPermission.addEventListener('click', refreshVaultStatus);
   els.saveSettings.addEventListener('click', async () => {
     try {
+      const previousSettings = currentSettings;
       currentSettings = { ...currentSettings, ...readForm() };
-      await saveSettings(currentSettings);
+      const purged = await saveSettingsAndMaybePurgeIndex(previousSettings, currentSettings);
       fillForm(currentSettings);
       applyTranslations(document, currentSettings.uiLanguage);
-      els.indexStatus.textContent = t('settingsSaved');
+      els.indexStatus.textContent = purged ? t('settingsSavedIndexPurged') : t('settingsSaved');
     } catch (error) {
       showError(error);
     }
@@ -93,6 +95,14 @@ function readForm() {
     excludedFolders: splitLines(els.excludedFolders.value),
     excludedTags: splitLines(els.excludedTags.value)
   };
+}
+
+async function saveSettingsAndMaybePurgeIndex(previousSettings, nextSettings) {
+  await saveSettings(nextSettings);
+  if (!privacyIndexSettingsChanged(previousSettings, nextSettings)) return false;
+
+  await purgeVaultIndex();
+  return true;
 }
 
 function splitLines(text) {
