@@ -45,6 +45,10 @@ Obsidian Sidebar Search는 사용자가 직접 선택한 Obsidian Vault 폴더�
 - 의미 검색은 `src/lib/semantic-search.js`의 로컬 해시 임베딩과 `IdMapIndex` 형태의 allowlist 검색 어댑터로 동작합니다. 이는 `turbovec`의 stable id/allowlist 계약에 맞춘 브라우저 로컬 백엔드이며, 실제 `turbovec` Rust/Python 엔진은 MV3 호환 WASM 또는 네이티브 브리지 빌드가 확보되면 같은 경계에서 교체할 수 있습니다.
 - 우클릭 메뉴의 `Obsidian 태그로 검색: "%s"`는 선택 텍스트를 사이드패널 태그 검색어로 넘깁니다.
 
+## Turbovec 호환성
+
+의미 검색은 `turbovec`의 핵심 검색 계약인 stable external note ID, local vector, allowlist-filtered vector search를 기준으로 설계했습니다. 현재 Chrome MV3 확장에서는 공개 `turbovec` 패키지가 Rust/Python 중심이고 MV3-ready JavaScript 표면이 없기 때문에, 같은 계약을 브라우저 로컬 JavaScript 어댑터로 구현합니다. 이 방식은 Vault 내용을 로컬에 유지하면서 향후 `turbovec` WASM 또는 사용자가 승인한 로컬 브리지가 준비될 때 교체 지점을 명확히 남깁니다.
+
 ## 프라이버시
 
 - Vault 내용은 외부 서비스로 전송하지 않습니다.

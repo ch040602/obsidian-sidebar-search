@@ -45,6 +45,10 @@ The extension only reads Markdown files from the folder you select. Vault conten
 - Semantic search currently uses `src/lib/semantic-search.js`, a browser-local hashed embedding backend with an `IdMapIndex`-style allowlist adapter. It is shaped to match turbovec stable-id and allowlist semantics; the actual turbovec Rust/Python engine can be swapped in at this boundary when an MV3-compatible WASM or native bridge is available.
 - The context-menu item `Obsidian tag search: "%s"` sends selected text to the side panel as a tag query.
 
+## Turbovec Compatibility
+
+Semantic search is built around turbovec's core retrieval contract: stable external note IDs, local vectors, and allowlist-filtered vector search. The Chrome MV3 extension currently implements that contract in a browser-local JavaScript adapter because the public turbovec package surfaces are Rust/Python rather than MV3-ready JavaScript. This keeps Vault content local while preserving a clear replacement point for a future turbovec WASM or approved local bridge.
+
 ## Privacy
 
 - Vault content is not sent to external services.
