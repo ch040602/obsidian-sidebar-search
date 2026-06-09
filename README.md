@@ -45,6 +45,23 @@ The extension only reads Markdown files from the folder you select. Vault conten
 - Semantic search currently uses `src/lib/semantic-search.js`, a browser-local hashed embedding backend with an `IdMapIndex`-style allowlist adapter. It is shaped to match turbovec stable-id and allowlist semantics; the actual turbovec Rust/Python engine can be swapped in at this boundary when an MV3-compatible WASM or native bridge is available.
 - The context-menu item `Obsidian tag search: "%s"` sends selected text to the side panel as a tag query.
 
+## Tag And Description Handling
+
+Tags are treated as Obsidian metadata, not as generic text. The index reads frontmatter `tags` and `tag` fields plus inline Markdown `#tags`, normalizes `#research` and `research` to the same value, and keeps tag-mode results limited to notes that actually contain that tag. Nested tags such as `research/papers` match a `research` tag query, while partial words do not match longer tags.
+
+Page descriptions are used for related-note search. The content script reads the active page title, selected text, heading, canonical URL, and `<meta name="description">` when available. That description is not saved into the Vault; it is only used inside the extension as local query context for the current search.
+
+## Usage Guide
+
+1. Load this folder as an unpacked Chrome extension.
+2. Open the side panel or Options page and choose your Obsidian Vault folder.
+3. Set the Obsidian Vault name in Options if `obsidian://open` links should target a specific Vault.
+4. Review excluded folders and tags, then click `Rebuild Index`.
+5. Select text on any web page and use the context menu or shortcut to search it as an actual Obsidian tag.
+6. Use `Full` for text/semantic search across titles, aliases, headings, tags, excerpts, and note text.
+7. Use `Related Notes` on an article, search page, or documentation page to rank notes by URL/domain, page title, page description, selected text, BM25 lexical matches, and local semantic vectors.
+8. Click `Open in Obsidian` on a result to open the note through `obsidian://open`.
+
 ## Turbovec Compatibility
 
 Semantic search is built around turbovec's core retrieval contract: stable external note IDs, local vectors, and allowlist-filtered vector search. The Chrome MV3 extension currently implements that contract in a browser-local JavaScript adapter because the public turbovec package surfaces are Rust/Python rather than MV3-ready JavaScript. This keeps Vault content local while preserving a clear replacement point for a future turbovec WASM or approved local bridge.

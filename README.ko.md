@@ -45,6 +45,23 @@ Obsidian Sidebar Search는 사용자가 직접 선택한 Obsidian Vault 폴더�
 - 의미 검색은 `src/lib/semantic-search.js`의 로컬 해시 임베딩과 `IdMapIndex` 형태의 allowlist 검색 어댑터로 동작합니다. 이는 `turbovec`의 stable id/allowlist 계약에 맞춘 브라우저 로컬 백엔드이며, 실제 `turbovec` Rust/Python 엔진은 MV3 호환 WASM 또는 네이티브 브리지 빌드가 확보되면 같은 경계에서 교체할 수 있습니다.
 - 우클릭 메뉴의 `Obsidian 태그로 검색: "%s"`는 선택 텍스트를 사이드패널 태그 검색어로 넘깁니다.
 
+## 태그와 description 처리
+
+태그는 일반 본문 텍스트가 아니라 Obsidian 메타데이터로 취급합니다. 인덱스는 frontmatter의 `tags`, `tag` 필드와 본문 inline `#tag`를 읽고, `#research`와 `research`를 같은 값으로 정규화합니다. 태그 모드는 실제 해당 태그를 가진 노트만 반환합니다. `research/papers` 같은 하위 태그는 `research` 검색에 포함되지만, 긴 태그 안의 부분 단어는 태그 검색 결과로 섞지 않습니다.
+
+페이지 description은 관련 노트 검색에 사용합니다. content script는 현재 페이지의 title, 선택 텍스트, heading, canonical URL, 그리고 가능한 경우 `<meta name="description">` 값을 읽습니다. 이 description은 Vault에 저장하지 않고, 현재 검색을 위한 로컬 query context로만 확장 내부에서 사용합니다.
+
+## 사용 가이드
+
+1. 이 폴더를 Chrome의 unpacked extension으로 등록합니다.
+2. 사이드패널 또는 Options 페이지에서 Obsidian Vault 폴더를 선택합니다.
+3. `obsidian://open` 링크가 특정 Vault를 열어야 한다면 Options에서 Vault 이름을 입력합니다.
+4. 제외 폴더와 제외 태그를 확인한 뒤 `인덱스 재생성`을 클릭합니다.
+5. 웹페이지에서 텍스트를 선택한 뒤 우클릭 메뉴나 단축키로 실제 Obsidian 태그 검색을 실행합니다.
+6. `전체`는 제목, 별칭, 헤딩, 태그, 발췌문, 본문을 대상으로 어휘 검색과 로컬 의미 검색을 함께 수행합니다.
+7. `관련 노트`는 글, 검색 결과 페이지, 문서 페이지에서 URL/domain, 페이지 제목, description, 선택 텍스트, BM25 어휘 점수, 로컬 의미 벡터를 함께 사용해 노트를 순위화합니다.
+8. 결과의 `Obsidian에서 열기`를 누르면 `obsidian://open`으로 해당 노트를 엽니다.
+
 ## Turbovec 호환성
 
 의미 검색은 `turbovec`의 핵심 검색 계약인 stable external note ID, local vector, allowlist-filtered vector search를 기준으로 설계했습니다. 현재 Chrome MV3 확장에서는 공개 `turbovec` 패키지가 Rust/Python 중심이고 MV3-ready JavaScript 표면이 없기 때문에, 같은 계약을 브라우저 로컬 JavaScript 어댑터로 구현합니다. 이 방식은 Vault 내용을 로컬에 유지하면서 향후 `turbovec` WASM 또는 사용자가 승인한 로컬 브리지가 준비될 때 교체 지점을 명확히 남깁니다.
